@@ -47,6 +47,7 @@ services:
     environment:
       - MAIN_BUCKET=general
       - STORAGE_PORT=9000
+      - GENERAL_TIMEOUT=5000
     privileged: true
     depends_on:
       - amazin-object-storage-node-1

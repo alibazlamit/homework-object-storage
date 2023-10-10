@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alibazlamit/homework-object-storage/config"
 	"github.com/alibazlamit/homework-object-storage/loadbalancer"
 	"github.com/alibazlamit/homework-object-storage/storage_client"
 	"github.com/gorilla/mux"
@@ -17,6 +18,8 @@ var storageClientInstance storage_client.StorageClient
 var lb loadbalancer.Loadbalancer
 
 func main() {
+	//load env configs
+	config.AppConfig.LoadConfig()
 	//handle routes here so far we only have two
 	router := mux.NewRouter()
 	router.HandleFunc("/object/{id:[a-zA-Z0-9]+}", getObject).Methods("GET")
@@ -34,7 +37,7 @@ func main() {
 }
 
 func getObject(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.AppConfig.GeneralTimeout)*time.Millisecond)
 	defer cancel()
 	params := mux.Vars(r)
 	objectID := params["id"]
@@ -47,7 +50,7 @@ func getObject(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case ctx.Err() == context.DeadlineExceeded:
 			// Handle timeout error
-			handleError(w, err, http.StatusGatewayTimeout, "Request timed out")
+			handleError(w, err, http.StatusRequestTimeout, "Request timed out")
 		case strings.Contains(err.Error(), "The specified key does not exist"):
 			// Handle not found error
 			handleError(w, err, http.StatusNotFound, "Object not found")
@@ -63,7 +66,7 @@ func getObject(w http.ResponseWriter, r *http.Request) {
 }
 
 func putObject(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.AppConfig.GeneralTimeout)*time.Millisecond)
 	defer cancel()
 	params := mux.Vars(r)
 	objectID := params["id"]
@@ -81,7 +84,7 @@ func putObject(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case ctx.Err() == context.DeadlineExceeded:
-			handleError(w, err, http.StatusGatewayTimeout, "Request timed out")
+			handleError(w, err, http.StatusRequestTimeout, "Request timed out")
 		default:
 			handleError(w, err, http.StatusInternalServerError, "Error updating object")
 		}
