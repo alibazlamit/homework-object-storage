@@ -12,12 +12,14 @@ import (
 	"github.com/alibazlamit/homework-object-storage/logger"
 	"github.com/alibazlamit/homework-object-storage/models"
 	"github.com/docker/docker/api/types"
+	dockerEvents "github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 )
 
 var minioInstances = map[string]models.StorageInstanceInfo{}
-var keyName string = "amazin-object-storage"
+
+const keyName string = "amazin-object-storage"
 
 type MinioLoadbalancer struct {
 }
@@ -111,24 +113,38 @@ func (lb MinioLoadbalancer) SelectStorageInstance(objectID string) (*models.Stor
 }
 
 func (lb MinioLoadbalancer) WatchContainerChanges() {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	dc, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		panic(err)
 	}
-
+	defer dc.Close()
 	options := types.EventsOptions{
 		Filters: filters.NewArgs(),
 	}
 
-	events, errCh := cli.Events(context.Background(), options)
+	// using docker get the events stream and look for any actions that might need to trigger the rediscovery of instances
+	events, errCh := dc.Events(context.Background(), options)
+	defer func() {
+		if err := dc.Close(); err != nil {
+			logger.Log.Error(err)
+		}
+	}()
 
+	triggerActions := []string{"start", "oom", "stop"}
 	for {
 		select {
+		//events channel check for any action of type container below
 		case event := <-events:
-			if event.Action == "start" || event.Action == "die" ||
-				event.Action == "kill" || event.Action == "oom" || event.Action == "stop" {
-				lb.DiscoverStorageInstances()
+			if event.Type == dockerEvents.ContainerEventType {
+				logger.Log.Infof("Event in container %v, of actor id %v", event.Action, event.Actor.ID)
+				for _, action := range triggerActions {
+					if event.Action == action {
+						lb.DiscoverStorageInstances()
+						break
+					}
+				}
 			}
+		//error channel
 		case err := <-errCh:
 			if err != nil {
 				logger.Log.Error(err)
