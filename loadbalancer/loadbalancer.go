@@ -5,7 +5,7 @@ import (
 )
 
 type Loadbalancer interface {
-	SelectStorageInstance(objectID string) *models.StorageInstanceInfo
+	SelectStorageInstance(objectID string) (*models.StorageInstanceInfo, error)
 	DiscoverStorageInstances() map[string]models.StorageInstanceInfo
 	WatchContainerChanges()
 }

@@ -42,7 +42,11 @@ func getObject(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	objectID := params["id"]
 	//based on id get the lb'd instance
-	storageInstance := lb.SelectStorageInstance(objectID)
+	storageInstance, err := lb.SelectStorageInstance(objectID)
+	if err != nil {
+		handleError(w, err, http.StatusNotFound, "no storage instance found")
+		return
+	}
 	storageClientInstance = storageClientInstance.GetStorageClient(storageInstance)
 
 	body, err := storageClientInstance.GetObject(ctx, objectID)
@@ -77,7 +81,11 @@ func putObject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// based on id get the lb'd instance
-	storageInstance := lb.SelectStorageInstance(objectID)
+	storageInstance, err := lb.SelectStorageInstance(objectID)
+	if err != nil {
+		handleError(w, err, http.StatusInternalServerError, "no storage instance found")
+		return
+	}
 	storageClientInstance = storageClientInstance.GetStorageClient(storageInstance)
 
 	err = storageClientInstance.UpdateObject(ctx, objectID, body)
