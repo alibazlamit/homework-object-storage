@@ -66,19 +66,23 @@ func (lb MinioLoadbalancer) DiscoverStorageInstances() map[string]models.Storage
 }
 
 func (lb MinioLoadbalancer) SelectStorageInstance(objectID string) *models.StorageInstanceInfo {
+	//consistent hashing used below to load balance
 	hashValue := hash(objectID)
 
 	instanceIDs := make([]string, 0, len(minioInstances))
 
+	// collect instanceIds
 	for k := range minioInstances {
 		instanceIDs = append(instanceIDs, k)
 	}
 
+	//sort to be used in an order for consistent hashing
 	sort.Slice(instanceIDs, func(i, j int) bool {
 		return hash(instanceIDs[i]) < hash(instanceIDs[j])
 	})
 
 	selectedInstanceID := ""
+	// go through sorted ids and find a one instance who has greater hash value than hashed id
 	for _, id := range instanceIDs {
 		if hash(id) > hashValue {
 			selectedInstanceID = id
@@ -86,6 +90,7 @@ func (lb MinioLoadbalancer) SelectStorageInstance(objectID string) *models.Stora
 		}
 	}
 
+	// default case if no hashed ID is bigger than objectIds hash
 	if selectedInstanceID == "" {
 		selectedInstanceID = instanceIDs[0]
 		logger.Log.Warnf("consistent hashing could not find instance, selected instance %v", selectedInstanceID)
