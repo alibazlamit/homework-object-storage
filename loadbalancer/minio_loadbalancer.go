@@ -31,14 +31,16 @@ func (lb MinioLoadbalancer) DiscoverStorageInstances() map[string]models.Storage
 	if err != nil {
 		logger.Log.Errorf("Error initializing Minio client: %v", err)
 	}
+	// list all containers
 	containers, err := dc.ContainerList(context.Background(), types.ContainerListOptions{})
 	if err != nil {
 		logger.Log.Errorf("Failed to list containers: %v", err)
 	}
 
-	// Iterate through containers and check if name has our prefix its a minio instance. Get IP user and pass
+	// iterate through containers and check if name has our prefix its a minio instance. Get IP user and pass
 	for _, cnt := range containers {
 		for _, cntName := range cnt.Names {
+			// check if containers name contains keyName value
 			if strings.Contains(cntName, keyName) {
 				inspect, err := dc.ContainerInspect(context.Background(), cnt.ID)
 				if err != nil {
@@ -46,6 +48,7 @@ func (lb MinioLoadbalancer) DiscoverStorageInstances() map[string]models.Storage
 					break
 				}
 
+				// if instance is not running no need to add it
 				if inspect.State.Running {
 					user, pass := getUserAndPassFromEnv(inspect.Config.Env)
 					host := inspect.NetworkSettings.Networks[string(inspect.HostConfig.NetworkMode)].IPAddress
